@@ -1,18 +1,15 @@
-# Logistiek Dashboard - Cradle & Pallet Behoefte (Updatable!)
+# Logistiek Dashboard - Cradle & Pallet Behoefte (Updatable v2)
 
-Dit dashboard is nu **updatable**: upload een nieuwe Excel (of plak gekopieerde data) en alles wordt automatisch herberekend!
+**Nieuw in v2:**
+- Upload een compleet Excel-bestand (.xls/.xlsx) → automatisch uitlezen
+- Oude data blijft zichtbaar als je niets uploadt
+- Geen kopiëren/plakken meer nodig
 
-### Hoe update je de data?
-1. Open je nieuwe Excel-bestand
-2. Selecteer ALLE data (vanaf de koprij "Ordernummer" tot de laatste rij)
-3. Kopieer (Ctrl+C)
-4. Open dit dashboard (index.html)
-5. Klik op "Nieuwe data plakken uit Excel"
-6. Plak de gekopieerde data in het tekstvak
-7. Klik "Update Dashboard" → alles is direct bijgewerkt!
+### Hoe update je?
+1. Klik op "Kies Excel-bestand" hieronder
+2. Selecteer je nieuwe "Logistiek - Cradle behoefte.xls" of .xlsx
+3. Wacht even → dashboard wordt automatisch bijgewerkt!
 
-- Werkt volledig offline
-- Printklaar
-- Mobielvriendelijk op GitHub app
+Open `index.html` in je browser (ook op telefoon via GitHub app preview).
 
-Stand huidige data: t/m 29 december 2025 (update wanneer jij wilt!)
+Stand huidige data: t/m 29 december 2025
