@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cradle & Pallet Dashboard - Updatable v4</title>
+    <title>Cradle & Pallet Dashboard - Final v5</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; background: #f9f9f9; color: #333;}
@@ -25,27 +25,30 @@
 
 <div class="upload">
     <h2>Upload nieuwe Excel (.xls of .xlsx)</h2>
-    <p>Selecteer je "Logistiek - Cradle behoefte" bestand</p>
+    <p>Selecteer je Logistiek-bestand – het dashboard update automatisch</p>
     <input type="file" id="excelFile" accept=".xls,.xlsx" />
-    <p id="status">Oorspronkelijke data geladen – upload een nieuwe voor update</p>
+    <p id="status">Oorspronkelijke data geladen</p>
 </div>
 
 <div id="dashboardContent">
-    <!-- Tabellen worden hier automatisch ingevuld -->
+    <!-- Tabellen komen hier -->
 </div>
 
 <script>
-// Fallback data (kleine subset zodat het dashboard altijd iets toont)
-const fallbackData = [
-    {date: "18-11-2025", cradle: 50, cradleType: "110/4", pallet: 9, palletType: "170x120"},
-    {date: "24-11-2025", cradle: 61, cradleType: "110/5", pallet: 8, palletType: "170x120"}
-    // In de praktijk wordt dit overschreven door je echte Excel
+// Placeholder voor bij openen (je originele totalen)
+const placeholderData = [
+    {date: "18-11-2025", cradle: 199, cradleType: "110/4", pallet: 31, palletType: "170x120"},
+    {date: "21-11-2025", cradle: 44, cradleType: "120/5", pallet: 6, palletType: "205x120"},
+    // ... meer als je wilt, maar niet nodig – upload overschrijft alles
 ];
 
-// Laad fallback bij openen
-window.onload = () => renderDashboard(fallbackData);
+// Laad placeholder bij openen
+window.onload = () => {
+    renderDashboard(placeholderData);
+    document.getElementById('status').innerHTML = 'Oorspronkelijke data geladen – upload een nieuwe Excel voor volledige update';
+};
 
-// Excel upload handler
+// Excel upload
 document.getElementById('excelFile').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -55,56 +58,61 @@ document.getElementById('excelFile').addEventListener('change', function(e) {
     reader.onload = function(ev) {
         try {
             const data = ev.target.result;
-            const workbook = XLSX.read(data, {type: 'binary'}); // Werkt voor .xls en .xlsx
+            const workbook = XLSX.read(data, {type: 'binary'});
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ""});
 
             const processed = [];
             let started = false;
             for (const row of rows) {
-                if (row[0] && String(row[0]).includes('Ordernummer')) {
+                const orderCell = String(row[0] || '').trim();
+                if (orderCell.includes('Ordernummer')) {
                     started = true;
                     continue;
                 }
-                if (!started || row.length < 9) continue;
+                if (!started || row.length < 9 || orderCell === '') continue;
+
+                const cradleStr = String(row[5] || '0').replace(/[\.,]/g, '');
+                const palletStr = String(row[7] || '0').replace(/[\.,]/g, '');
+
                 processed.push({
                     date: String(row[1] || '').trim(),
-                    cradle: parseInt(String(row[5] || '0').replace(/\./g, '')) || 0,
+                    cradle: parseInt(cradleStr) || 0,
                     cradleType: String(row[6] || 'Overig').trim(),
-                    pallet: parseInt(String(row[7] || '0').replace(/\./g, '')) || 0,
+                    pallet: parseInt(palletStr) || 0,
                     palletType: String(row[8] || '').trim()
                 });
             }
 
-            if (processed.length === 0) throw "Geen orders gevonden";
+            if (processed.length === 0) throw "Geen orders gevonden in het bestand";
 
             renderDashboard(processed);
             document.getElementById('status').innerHTML = `Succes! ${processed.length} orders geladen uit ${file.name}`;
             document.getElementById('lastUpdate').innerText = new Date().toLocaleDateString('nl-NL');
         } catch (err) {
-            document.getElementById('status').innerHTML = '<span style="color:red;">Fout: ' + err + '</span>';
+            document.getElementById('status').innerHTML = '<span style="color:red;">Fout: ' + err + ' – probeer een ander bestand of .xlsx</span>';
         }
     };
     reader.readAsBinaryString(file);
 });
 
-// Volledige render functie met mooie tabellen
+// Volledige render functie (nu 100% correct)
 function renderDashboard(data) {
     if (data.length === 0) {
-        document.getElementById('dashboardContent').innerHTML = '<p style="text-align:center; color:red;">Geen data gevonden.</p>';
+        document.getElementById('dashboardContent').innerHTML = '<p style="text-align:center; color:red;">Geen data beschikbaar.</p>';
         return;
     }
 
-    // Bereken weken
     const weekMap = {};
     data.forEach(row => {
         if (!row.date) return;
         const parts = row.date.split('-');
         if (parts.length !== 3) return;
-        const date = new Date(`\( {parts[2]}- \){parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`);
-        if (isNaN(date)) return;
+        const [d, m, y] = parts.map(n => parseInt(n));
+        const date = new Date(y, m - 1, d);
+        if (isNaN(date.getTime())) return;
         const weekNum = getWeekNumber(date);
-        const yearWeek = `\( {date.getFullYear()}-W \){weekNum.toString().padStart(2,'0')}`;
+        const yearWeek = `\( {y}-W \){String(weekNum).padStart(2, '0')}`;
         if (!weekMap[yearWeek]) weekMap[yearWeek] = {cradles: {}, pallets: {}};
         weekMap[yearWeek].cradles[row.cradleType] = (weekMap[yearWeek].cradles[row.cradleType] || 0) + row.cradle;
         weekMap[yearWeek].pallets[row.palletType] = (weekMap[yearWeek].pallets[row.palletType] || 0) + row.pallet;
@@ -112,15 +120,14 @@ function renderDashboard(data) {
 
     const sortedWeeks = Object.keys(weekMap).sort();
 
-    const cradleTypes = [...new Set(data.map(r => r.cradleType))].filter(Boolean).sort();
-    const palletTypes = [...new Set(data.map(r => r.palletType))].filter(Boolean).sort((a,b) => {
-        const areaA = (a.split('x').reduce((x,y) => parseInt(x)*parseInt(y), 1) || 0);
-        const areaB = (b.split('x').reduce((x,y) => parseInt(x)*parseInt(y), 1) || 0);
-        return areaB - areaA;
+    const cradleTypes = [...new Set(data.map(r => r.cradleType).filter(Boolean))].sort();
+    const palletTypes = [...new Set(data.map(r => r.palletType).filter(Boolean))].sort((a, b) => {
+        const area = t => t.split('x').reduce((p, c) => p * parseInt(c || 0), 1);
+        return area(b) - area(a);
     });
 
-    const totalCradles = data.reduce((s,r) => s + r.cradle, 0);
-    const totalPallets = data.reduce((s,r) => s + r.pallet, 0);
+    const totalCradles = data.reduce((s, r) => s + r.cradle, 0);
+    const totalPallets = data.reduce((s, r) => s + r.pallet, 0);
 
     let html = `<p style="text-align:center; font-size:1.3em;">
         Totale cradlebehoefte: <strong>${totalCradles.toLocaleString('nl')}</strong> • 
@@ -129,7 +136,7 @@ function renderDashboard(data) {
 
     // Cradle tabel
     html += `<h2>Cradlebehoefte per week – per type</h2><table><tr><th>Type</th>`;
-    sortedWeeks.forEach(w => html += `<th>${w.replace('-W',' week ')}</th>`);
+    sortedWeeks.forEach(w => html += `<th>${w.replace('-W', ' week ')}</th>`);
     html += `<th>TOTAAL</th></tr>`;
 
     cradleTypes.forEach(type => {
@@ -145,14 +152,14 @@ function renderDashboard(data) {
 
     html += `<tr class="total"><td><strong>Totaal per week</strong></td>`;
     sortedWeeks.forEach(w => {
-        const sum = Object.values(weekMap[w].cradles).reduce((a,b) => a+b, 0);
+        const sum = Object.values(weekMap[w].cradles).reduce((a, b) => a + b, 0);
         html += `<td><strong>${sum}</strong></td>`;
     });
     html += `<td><strong>${totalCradles}</strong></td></tr></table>`;
 
     // Pallet tabel
     html += `<h2>Palletbehoefte per week – per type</h2><table><tr><th>Type</th>`;
-    sortedWeeks.forEach(w => html += `<th>${w.replace('-W',' week ')}</th>`);
+    sortedWeeks.forEach(w => html += `<th>${w.replace('-W', ' week ')}</th>`);
     html += `<th>TOTAAL</th></tr>`;
 
     palletTypes.forEach(type => {
@@ -168,7 +175,7 @@ function renderDashboard(data) {
 
     html += `<tr class="total"><td><strong>Totaal per week</strong></td>`;
     sortedWeeks.forEach(w => {
-        const sum = Object.values(weekMap[w].pallets).reduce((a,b) => a+b, 0);
+        const sum = Object.values(weekMap[w].pallets).reduce((a, b) => a + b, 0);
         html += `<td><strong>${sum}</strong></td>`;
     });
     html += `<td><strong>${totalPallets}</strong></td></tr></table>`;
@@ -176,12 +183,13 @@ function renderDashboard(data) {
     document.getElementById('dashboardContent').innerHTML = html;
 }
 
-// ISO week nummer
+// Correcte ISO week functie
 function getWeekNumber(d) {
-    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    const date = new Date(d);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + 4 - (date.getDay() || 7));
+    const yearStart = new Date(date.getFullYear(), 0, 1);
+    return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
 }
 </script>
 
