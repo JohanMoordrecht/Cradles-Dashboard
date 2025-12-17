@@ -1,18 +1,179 @@
-# Logistiek Dashboard - Cradle & Pallet Behoefte (Updatable!)
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cradle & Pallet Dashboard - Updatable</title>
+    <style>
+        body {font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; background: #f9f9f9;}
+        h1, h2 {color: #003087; text-align: center;}
+        table {border-collapse: collapse; width: 100%; margin: 25px 0;}
+        th, td {border: 1px solid #000; padding: 10px; text-align: center;}
+        th {background-color: #003087; color: white;}
+        .total {font-weight: bold; background-color: #ddd;}
+        textarea {width: 100%; height: 200px; font-family: monospace;}
+        button {padding: 10px 20px; background: #003087; color: white; border: none; cursor: pointer; font-size: 1.1em;}
+        button:hover {background: #0050b3;}
+        .upload {background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin: 20px 0;}
+        @media print { .upload {display: none;} body {margin: 10mm;} }
+    </style>
+</head>
+<body>
 
-Dit dashboard is nu **updatable**: upload een nieuwe Excel (of plak gekopieerde data) en alles wordt automatisch herberekend!
+<h1>LOGISTIEK DASHBOARD – CRADLE & PALLET BEHOEFTE</h1>
+<p style="text-align:center;"><strong>Periode:</strong> tot en met 29 december 2025<br><strong>Laatste update:</strong> <span id="lastUpdate">originele data</span></p>
 
-### Hoe update je de data?
-1. Open je nieuwe Excel-bestand
-2. Selecteer ALLE data (vanaf de koprij "Ordernummer" tot de laatste rij)
-3. Kopieer (Ctrl+C)
-4. Open dit dashboard (index.html)
-5. Klik op "Nieuwe data plakken uit Excel"
-6. Plak de gekopieerde data in het tekstvak
-7. Klik "Update Dashboard" → alles is direct bijgewerkt!
+<div class="upload">
+    <h2>Nieuwe data plakken uit Excel</h2>
+    <p>Selecteer en kopieer alles uit je Excel (incl. koprij "Ordernummer") → plak hieronder → klik Update</p>
+    <textarea id="pasteArea" placeholder="Plak hier je gekopieerde Excel-data..."></textarea><br><br>
+    <button onclick="updateDashboard()">Update Dashboard met nieuwe data</button>
+    <p id="status" style="color:green;"></p>
+</div>
 
-- Werkt volledig offline
-- Printklaar
-- Mobielvriendelijk op GitHub app
+<div id="dashboardContent">
+    <!-- Hier komen de tabellen na update -->
+</div>
 
-Stand huidige data: t/m 29 december 2025 (update wanneer jij wilt!)
+<script>
+// Default data (jouw huidige Excel als fallback)
+const defaultData = `Ordernummer	Afleverdatum	Artikel	Artikelomschrijving	Aantal	Cradle behoefte	Cradle Type	Pallet behoefte	Pallet Type
+826507	18-11-2025	F926FR02/160	Basic Display 210 FR - 1,60 x 100 m	9,901	50	110/4	9	170x120
+826612	24-11-2025	F905FR01A/160	Basic Flag 110 FR - 1,60 x 100 m	15,210	61	110/5	8	170x120
+// ... (je volledige huidige data – plak hier eventueel meer regels als je wilt, maar het werkt ook zonder)
+Totale behoefte cradles en pallets t/m 29-12-2025			3,548			651`;
+
+// Laad default bij openen
+window.onload = () => updateDashboard(defaultData);
+
+function updateDashboard(customText = null) {
+    const text = customText || document.getElementById('pasteArea').value || defaultData;
+    if (!text.trim()) {
+        document.getElementById('status').innerHTML = 'Geen data gevonden!';
+        return;
+    }
+
+    const lines = text.trim().split('\n');
+    const data = [];
+    let started = false;
+    for (const line of lines) {
+        if (line.includes('Ordernummer')) {
+            started = true;
+            continue;
+        }
+        if (!started || line.trim() === '' || line.includes('Totale')) continue;
+        const cols = line.split('\t');
+        if (cols.length < 9) continue;
+        data.push({
+            date: cols[1].trim(),
+            cradle: parseInt(cols[5].replace(/\./g,'')) || 0,
+            cradleType: (cols[6] || '').trim() || 'Overig',
+            pallet: parseInt(cols[7].replace(/\./g,'')) || 0,
+            palletType: (cols[8] || '').trim()
+        });
+    }
+
+    if (data.length === 0) {
+        document.getElementById('status').innerHTML = 'Geen geldige rijen gevonden. Controleer je plak!';
+        return;
+    }
+
+    // Bereken weken
+    const weekMap = {};
+    data.forEach(row => {
+        const [d, m, y] = row.date.split('-');
+        const date = new Date(`\( {y}- \){m}-${d}`);
+        const weekNum = date.getWeek();
+        const yearWeek = `\( {y}-W \){weekNum.toString().padStart(2,'0')}`;
+        if (!weekMap[yearWeek]) weekMap[yearWeek] = {cradles: {}, pallets: {}};
+        // Cradles
+        weekMap[yearWeek].cradles[row.cradleType] = (weekMap[yearWeek].cradles[row.cradleType] || 0) + row.cradle;
+        // Pallets
+        weekMap[yearWeek].pallets[row.palletType] = (weekMap[yearWeek].pallets[row.palletType] || 0) + row.pallet;
+    });
+
+    // Sorteer weken
+    const sortedWeeks = Object.keys(weekMap).sort();
+
+    // Alle unieke types verzamelen
+    const allCradleTypes = new Set();
+    const allPalletTypes = new Set();
+    Object.values(weekMap).forEach(w => {
+        Object.keys(w.cradles).forEach(t => allCradleTypes.add(t));
+        Object.keys(w.pallets).forEach(t => allPalletTypes.add(t));
+    });
+    const cradleTypes = Array.from(allCradleTypes).sort();
+    const palletTypes = Array.from(allPalletTypes).sort((a,b) => parseInt(b) - parseInt(a)); // grof sorteren
+
+    // Totalen
+    const totalCradles = data.reduce((s,r) => s + r.cradle, 0);
+    const totalPallets = data.reduce((s,r) => s + r.pallet, 0);
+
+    // Bouw HTML
+    let html = `<p style="text-align:center; font-size:1.2em;">Totale cradlebehoefte: <strong>\( {totalCradles.toLocaleString('nl')}</strong> • Totale palletbehoefte: <strong> \){totalPallets.toLocaleString('nl')}</strong></p>`;
+
+    html += `<h2>CRADLEBEHOEFTE PER WEEK – PER TYPE</h2><table><tr><th>Week</th>`;
+    sortedWeeks.forEach(w => html += `<th>${w.replace('-W',' week ')}</th>`);
+    html += `<th>TOTAAL</th></tr>`;
+
+    const cradleTotals = {};
+    cradleTypes.forEach(type => {
+        html += `<tr><td><strong>${type || 'Overig'}</strong></td>`;
+        let rowTotal = 0;
+        sortedWeeks.forEach(w => {
+            const val = weekMap[w].cradles[type] || 0;
+            html += `<td>${val}</td>`;
+            rowTotal += val;
+            cradleTotals[type] = (cradleTotals[type] || 0) + val;
+        });
+        html += `<td class="total">${rowTotal}</td></tr>`;
+    });
+
+    // Totaal rij
+    html += `<tr class="total"><td><strong>Totaal per week</strong></td>`;
+    sortedWeeks.forEach(w => {
+        const weekTotal = Object.values(weekMap[w].cradles).reduce((s,v) => s+v, 0);
+        html += `<td><strong>${weekTotal}</strong></td>`;
+    });
+    html += `<td><strong>${totalCradles}</strong></td></tr></table>`;
+
+    // Pallets hetzelfde
+    html += `<h2>PALLETBEHOEFTE PER WEEK – PER TYPE</h2><table><tr><th>Week</th>`;
+    sortedWeeks.forEach(w => html += `<th>${w.replace('-W',' week ')}</th>`);
+    html += `<th>TOTAAL</th></tr>`;
+
+    palletTypes.forEach(type => {
+        html += `<tr><td><strong>${type}</strong></td>`;
+        let rowTotal = 0;
+        sortedWeeks.forEach(w => {
+            const val = weekMap[w].pallets[type] || 0;
+            html += `<td>${val}</td>`;
+            rowTotal += val;
+        });
+        html += `<td class="total">${rowTotal}</td></tr>`;
+    });
+
+    html += `<tr class="total"><td><strong>Totaal per week</strong></td>`;
+    sortedWeeks.forEach(w => {
+        const weekTotal = Object.values(weekMap[w].pallets).reduce((s,v) => s+v, 0);
+        html += `<td><strong>${weekTotal}</strong></td>`;
+    });
+    html += `<td><strong>${totalPallets}</strong></td></tr></table>`;
+
+    document.getElementById('dashboardContent').innerHTML = html;
+    document.getElementById('status').innerHTML = `Dashboard bijgewerkt met \( {data.length} orders! ( \){new Date().toLocaleDateString('nl-NL')})`;
+    document.getElementById('lastUpdate').innerText = new Date().toLocaleDateString('nl-NL');
+}
+
+// Helper voor ISO week
+Date.prototype.getWeek = function() {
+    const d = new Date(Date.UTC(this.getFullYear(), this.getMonth(), this.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+};
+</script>
+
+</body>
+</html>
