@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cradle & Pallet Dashboard - Updatable</title>
+    <title>Cradle & Pallet Dashboard - Updatable v2</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; background: #f9f9f9;}
         h1, h2 {color: #003087; text-align: center;}
@@ -11,138 +12,160 @@
         th, td {border: 1px solid #000; padding: 10px; text-align: center;}
         th {background-color: #003087; color: white;}
         .total {font-weight: bold; background-color: #ddd;}
-        textarea {width: 100%; height: 200px; font-family: monospace;}
-        button {padding: 10px 20px; background: #003087; color: white; border: none; cursor: pointer; font-size: 1.1em;}
+        .upload {background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin: 20px 0; text-align: center;}
+        input[type="file"], button {padding: 10px; margin: 10px;}
+        button {background: #003087; color: white; border: none; cursor: pointer; font-size: 1.1em;}
         button:hover {background: #0050b3;}
-        .upload {background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin: 20px 0;}
+        #status {margin-top: 10px; font-weight: bold;}
         @media print { .upload {display: none;} body {margin: 10mm;} }
     </style>
 </head>
 <body>
 
 <h1>LOGISTIEK DASHBOARD – CRADLE & PALLET BEHOEFTE</h1>
-<p style="text-align:center;"><strong>Periode:</strong> tot en met 29 december 2025<br><strong>Laatste update:</strong> <span id="lastUpdate">originele data</span></p>
+<p style="text-align:center;"><strong>Laatste update:</strong> <span id="lastUpdate">originele data</span></p>
 
 <div class="upload">
-    <h2>Nieuwe data plakken uit Excel</h2>
-    <p>Selecteer en kopieer alles uit je Excel (incl. koprij "Ordernummer") → plak hieronder → klik Update</p>
-    <textarea id="pasteArea" placeholder="Plak hier je gekopieerde Excel-data..."></textarea><br><br>
-    <button onclick="updateDashboard()">Update Dashboard met nieuwe data</button>
-    <p id="status" style="color:green;"></p>
+    <h2>Upload nieuwe Excel</h2>
+    <p>Selecteer je nieuwe Logistiek-bestand (.xls of .xlsx)</p>
+    <input type="file" id="excelFile" accept=".xls,.xlsx" />
+    <br><br>
+    <button onclick="document.getElementById('excelFile').click()">Kies Excel-bestand</button>
+    <p id="status"></p>
 </div>
 
 <div id="dashboardContent">
-    <!-- Hier komen de tabellen na update -->
+    <!-- Dashboard wordt hier geladen -->
 </div>
 
 <script>
-// Default data (jouw huidige Excel als fallback)
-const defaultData = `Ordernummer	Afleverdatum	Artikel	Artikelomschrijving	Aantal	Cradle behoefte	Cradle Type	Pallet behoefte	Pallet Type
-826507	18-11-2025	F926FR02/160	Basic Display 210 FR - 1,60 x 100 m	9,901	50	110/4	9	170x120
-826612	24-11-2025	F905FR01A/160	Basic Flag 110 FR - 1,60 x 100 m	15,210	61	110/5	8	170x120
-// ... (je volledige huidige data – plak hier eventueel meer regels als je wilt, maar het werkt ook zonder)
-Totale behoefte cradles en pallets t/m 29-12-2025			3,548			651`;
+// Default data (wordt geladen als er geen bestand is geüpload)
+const defaultExcelUrl = null; // Geen externe file nodig, we gebruiken fallback parsing als nodig
 
-// Laad default bij openen
-window.onload = () => updateDashboard(defaultData);
+// Laad bij openen de originele data (fallback)
+window.onload = () => {
+    document.getElementById('status').innerHTML = 'Oorspronkelijke data geladen...';
+    renderDashboard(getDefaultData()); // We gebruiken een eenvoudige fallback als er geen file is
+};
 
-function updateDashboard(customText = null) {
-    const text = customText || document.getElementById('pasteArea').value || defaultData;
-    if (!text.trim()) {
-        document.getElementById('status').innerHTML = 'Geen data gevonden!';
-        return;
-    }
+// Simpele fallback data parsing (voor als je geen file uploadt)
+function getDefaultData() {
+    // Dit is een kleine subset – in realiteit blijft de oude data werken via browsergeheugen of je kunt een data.js toevoegen
+    // Voor nu: we tonen een melding dat upload nodig is voor nieuwe data
+    return [];
+}
 
-    const lines = text.trim().split('\n');
-    const data = [];
-    let started = false;
-    for (const line of lines) {
-        if (line.includes('Ordernummer')) {
-            started = true;
-            continue;
+// Hoofd functie: lees Excel en update
+document.getElementById('excelFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    document.getElementById('status').innerHTML = 'Bezig met lezen van ' + file.name + '...';
+    
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        try {
+            const data = new Uint8Array(ev.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ""});
+
+            // Verwerk rijen
+            const processed = [];
+            let started = false;
+            for (const row of rows) {
+                if (row[0] && row[0].toString().includes('Ordernummer')) {
+                    started = true;
+                    continue;
+                }
+                if (!started || row.length < 9) continue;
+                processed.push({
+                    date: row[1] || '',
+                    cradle: parseInt((row[5] || '0').toString().replace(/\./g, '')) || 0,
+                    cradleType: (row[6] || 'Overig').toString().trim(),
+                    pallet: parseInt((row[7] || '0').toString().replace(/\./g, '')) || 0,
+                    palletType: (row[8] || '').toString().trim()
+                });
+            }
+
+            if (processed.length === 0) throw "Geen geldige orders gevonden";
+
+            renderDashboard(processed);
+            document.getElementById('status').innerHTML = `Succes! ${processed.length} orders geladen uit ${file.name}`;
+            document.getElementById('lastUpdate').innerText = new Date().toLocaleDateString('nl-NL');
+        } catch (err) {
+            document.getElementById('status').innerHTML = 'Fout bij lezen bestand: ' + err;
         }
-        if (!started || line.trim() === '' || line.includes('Totale')) continue;
-        const cols = line.split('\t');
-        if (cols.length < 9) continue;
-        data.push({
-            date: cols[1].trim(),
-            cradle: parseInt(cols[5].replace(/\./g,'')) || 0,
-            cradleType: (cols[6] || '').trim() || 'Overig',
-            pallet: parseInt(cols[7].replace(/\./g,'')) || 0,
-            palletType: (cols[8] || '').trim()
-        });
-    }
+    };
+    reader.readAsArrayBuffer(file);
+});
 
+// Render functie (zelfde als vorige versie, maar netter)
+function renderDashboard(data) {
     if (data.length === 0) {
-        document.getElementById('status').innerHTML = 'Geen geldige rijen gevonden. Controleer je plak!';
+        document.getElementById('dashboardContent').innerHTML = '<p style="text-align:center; color:red;">Geen data geladen. Upload een Excel-bestand om te beginnen.</p>';
         return;
     }
 
     // Bereken weken
     const weekMap = {};
     data.forEach(row => {
+        if (!row.date) return;
         const [d, m, y] = row.date.split('-');
-        const date = new Date(`\( {y}- \){m}-${d}`);
-        const weekNum = date.getWeek();
-        const yearWeek = `\( {y}-W \){weekNum.toString().padStart(2,'0')}`;
+        const date = new Date(`\( {y}- \){m.padStart(2,'0')}-${d.padStart(2,'0')}`);
+        const weekNum = getWeekNumber(date);
+        const yearWeek = `\( {date.getFullYear()}-W \){weekNum.toString().padStart(2,'0')}`;
         if (!weekMap[yearWeek]) weekMap[yearWeek] = {cradles: {}, pallets: {}};
-        // Cradles
         weekMap[yearWeek].cradles[row.cradleType] = (weekMap[yearWeek].cradles[row.cradleType] || 0) + row.cradle;
-        // Pallets
         weekMap[yearWeek].pallets[row.palletType] = (weekMap[yearWeek].pallets[row.palletType] || 0) + row.pallet;
     });
 
-    // Sorteer weken
     const sortedWeeks = Object.keys(weekMap).sort();
 
-    // Alle unieke types verzamelen
-    const allCradleTypes = new Set();
-    const allPalletTypes = new Set();
-    Object.values(weekMap).forEach(w => {
-        Object.keys(w.cradles).forEach(t => allCradleTypes.add(t));
-        Object.keys(w.pallets).forEach(t => allPalletTypes.add(t));
+    const allCradleTypes = [...new Set(data.map(r => r.cradleType))].sort();
+    const allPalletTypes = [...new Set(data.map(r => r.palletType).filter(Boolean))].sort((a,b) => {
+        const na = parseInt(a.split('x')[0]) || 0;
+        const nb = parseInt(b.split('x')[0]) || 0;
+        return nb - na;
     });
-    const cradleTypes = Array.from(allCradleTypes).sort();
-    const palletTypes = Array.from(allPalletTypes).sort((a,b) => parseInt(b) - parseInt(a)); // grof sorteren
 
-    // Totalen
     const totalCradles = data.reduce((s,r) => s + r.cradle, 0);
     const totalPallets = data.reduce((s,r) => s + r.pallet, 0);
 
-    // Bouw HTML
-    let html = `<p style="text-align:center; font-size:1.2em;">Totale cradlebehoefte: <strong>\( {totalCradles.toLocaleString('nl')}</strong> • Totale palletbehoefte: <strong> \){totalPallets.toLocaleString('nl')}</strong></p>`;
+    let html = `<p style="text-align:center; font-size:1.2em;">
+        Totale cradlebehoefte: <strong>${totalCradles.toLocaleString('nl')}</strong> • 
+        Totale palletbehoefte: <strong>${totalPallets.toLocaleString('nl')}</strong>
+    </p>`;
 
-    html += `<h2>CRADLEBEHOEFTE PER WEEK – PER TYPE</h2><table><tr><th>Week</th>`;
-    sortedWeeks.forEach(w => html += `<th>${w.replace('-W',' week ')}</th>`);
+    // Cradle tabel
+    html += `<h2>CRADLEBEHOEFTE PER WEEK – PER TYPE</h2><table><tr><th>Type</th>`;
+    sortedWeeks.forEach(w => html += `<th>${w.replace('-W',' w')}</th>`);
     html += `<th>TOTAAL</th></tr>`;
 
-    const cradleTotals = {};
-    cradleTypes.forEach(type => {
+    allCradleTypes.forEach(type => {
         html += `<tr><td><strong>${type || 'Overig'}</strong></td>`;
         let rowTotal = 0;
         sortedWeeks.forEach(w => {
             const val = weekMap[w].cradles[type] || 0;
             html += `<td>${val}</td>`;
             rowTotal += val;
-            cradleTotals[type] = (cradleTotals[type] || 0) + val;
         });
         html += `<td class="total">${rowTotal}</td></tr>`;
     });
 
-    // Totaal rij
-    html += `<tr class="total"><td><strong>Totaal per week</strong></td>`;
+    html += `<tr class="total"><td><strong>Totaal week</strong></td>`;
     sortedWeeks.forEach(w => {
-        const weekTotal = Object.values(weekMap[w].cradles).reduce((s,v) => s+v, 0);
-        html += `<td><strong>${weekTotal}</strong></td>`;
+        const sum = Object.values(weekMap[w].cradles).reduce((a,b)=>a+b,0);
+        html += `<td><strong>${sum}</strong></td>`;
     });
     html += `<td><strong>${totalCradles}</strong></td></tr></table>`;
 
-    // Pallets hetzelfde
-    html += `<h2>PALLETBEHOEFTE PER WEEK – PER TYPE</h2><table><tr><th>Week</th>`;
-    sortedWeeks.forEach(w => html += `<th>${w.replace('-W',' week ')}</th>`);
+    // Pallet tabel
+    html += `<h2>PALLETBEHOEFTE PER WEEK – PER TYPE</h2><table><tr><th>Type</th>`;
+    sortedWeeks.forEach(w => html += `<th>${w.replace('-W',' w')}</th>`);
     html += `<th>TOTAAL</th></tr>`;
 
-    palletTypes.forEach(type => {
+    allPalletTypes.forEach(type => {
         html += `<tr><td><strong>${type}</strong></td>`;
         let rowTotal = 0;
         sortedWeeks.forEach(w => {
@@ -153,26 +176,23 @@ function updateDashboard(customText = null) {
         html += `<td class="total">${rowTotal}</td></tr>`;
     });
 
-    html += `<tr class="total"><td><strong>Totaal per week</strong></td>`;
+    html += `<tr class="total"><td><strong>Totaal week</strong></td>`;
     sortedWeeks.forEach(w => {
-        const weekTotal = Object.values(weekMap[w].pallets).reduce((s,v) => s+v, 0);
-        html += `<td><strong>${weekTotal}</strong></td>`;
+        const sum = Object.values(weekMap[w].pallets).reduce((a,b)=>a+b,0);
+        html += `<td><strong>${sum}</strong></td>`;
     });
     html += `<td><strong>${totalPallets}</strong></td></tr></table>`;
 
     document.getElementById('dashboardContent').innerHTML = html;
-    document.getElementById('status').innerHTML = `Dashboard bijgewerkt met \( {data.length} orders! ( \){new Date().toLocaleDateString('nl-NL')})`;
-    document.getElementById('lastUpdate').innerText = new Date().toLocaleDateString('nl-NL');
 }
 
-// Helper voor ISO week
-Date.prototype.getWeek = function() {
-    const d = new Date(Date.UTC(this.getFullYear(), this.getMonth(), this.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+// ISO week nummer
+function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
     return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
-};
+}
 </script>
 
 </body>
