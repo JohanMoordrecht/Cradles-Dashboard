@@ -3,30 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pallet & Cradle Behoefte - Volledig Dashboard</title>
+  <title>Pallet & Cradle Behoefte Dashboard</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
     h1, h2 { text-align: center; color: #2c3e50; }
-    .container { max-width: 1500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
     .upload-area { border: 3px dashed #3498db; border-radius: 10px; padding: 40px; text-align: center; margin-bottom: 30px; background: #ecf0f1; }
     .upload-area:hover { background: #d6e6f5; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; table-layout: auto; }
-    th { background: #3498db; color: white; padding: 12px; cursor: pointer; white-space: nowrap; }
-    th:hover { background: #2980b9; }
-    td { padding: 10px 12px; border-bottom: 1px solid #ddd; text-align: center; }
-    td.left { text-align: left; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th { background: #27ae60; color: white; padding: 14px; font-size: 1.1em; }
+    td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
     tr:nth-child(even) { background: #f9f9f9; }
-    .total-row { font-weight: bold; background: #2c3e50 !important; color: white; font-size: 1.1em; }
-    .summary-table th { background: #27ae60; }
+    .total-row { font-weight: bold; background: #2c3e50 !important; color: white; font-size: 1.2em; }
     .info { text-align: center; color: #7f8c8d; margin: 20px 0; font-size: 1.1em; }
     .error { color: #e74c3c; font-weight: bold; text-align: center; }
-    .section { margin-top: 60px; }
+    .toggle-btn {
+      display: block;
+      width: 300px;
+      margin: 30px auto;
+      padding: 12px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1.1em;
+      cursor: pointer;
+    }
+    .toggle-btn:hover { background: #2980b9; }
+    .details-section { display: none; margin-top: 40px; }
+    .details-table th { background: #3498db; }
+    .details-table td.left { text-align: left; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Pallet & Cradle Behoefte - Volledig Dashboard</h1>
+    <h1>Pallet & Cradle Behoefte Dashboard</h1>
 
     <div class="upload-area">
       <p><strong>Upload je Excel-bestand (.xls of .xlsx)</strong></p>
@@ -38,21 +50,6 @@
   </div>
 
   <script>
-    // Sorteerfunctie voor tabellen
-    function sortTable(table, colIndex, asc = true) {
-      const tbody = table.querySelector('tbody');
-      const rows = Array.from(tbody.querySelectorAll('tr'));
-      rows.sort((a, b) => {
-        let aText = a.cells[colIndex].innerText.trim();
-        let bText = b.cells[colIndex].innerText.trim();
-        if (!isNaN(aText) && !isNaN(bText) && aText !== '' && bText !== '') {
-          return asc ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
-        }
-        return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
-      });
-      rows.forEach(row => tbody.appendChild(row));
-    }
-
     document.getElementById('fileInput').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -65,20 +62,11 @@
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 
-          // Exacte kolomnamen zoals in jouw bestand
           const requiredCols = [
-            "Ordernummer",
-            "Afleverdatum", 
-            "Artikel",
-            "Artikelomschrijving",
-            "Aantal",
-            "Cradle behoefte",
-            "Cradle Type",
-            "Pallet behoefte",
-            "Pallet Type"
+            "Ordernummer", "Afleverdatum", "Artikel", "Artikelomschrijving",
+            "Aantal", "Cradle behoefte", "Cradle Type", "Pallet behoefte", "Pallet Type"
           ];
 
-          // Zoek de header rij
           let headerRow = -1;
           for (let i = 0; i < json.length; i++) {
             const row = json[i].map(cell => (cell || "").toString().trim());
@@ -88,11 +76,9 @@
             }
           }
 
-          if (headerRow === -1) throw new Error("Kolomnamen niet gevonden. Zorg dat alle kolommen exact aanwezig zijn.");
+          if (headerRow === -1) throw new Error("Kolomnamen niet gevonden in het bestand.");
 
           const headers = json[headerRow].map(h => (h || "").toString().trim());
-
-          // Maak mapping van kolomnaam naar index
           const colIndices = {};
           requiredCols.forEach(col => {
             const idx = headers.indexOf(col);
@@ -100,7 +86,6 @@
             colIndices[col] = idx;
           });
 
-          // Verzamel data rijen (skip lege en subtotaalrijen)
           const rows = [];
           for (let i = headerRow + 1; i < json.length; i++) {
             const rawRow = json[i];
@@ -109,11 +94,10 @@
             const ordernummer = (rawRow[colIndices["Ordernummer"]] || "").toString().trim();
             const palletType = (rawRow[colIndices["Pallet Type"]] || "").toString().trim();
 
-            // Skip subtotaalrijen (geen ordernummer en geen pallet type, of met totalen)
-            if ((ordernummer === "" || ordernummer === "0") && (palletType === "" || palletType.includes("TOTAAL"))) continue;
+            if ((ordernummer === "" || ordernummer === "0") && (palletType === "" || palletType.toLowerCase().includes("totaal"))) continue;
 
             rows.push({
-              ordernummer: ordernummer,
+              ordernummer, 
               afleverdatum: rawRow[colIndices["Afleverdatum"]] || "",
               artikel: rawRow[colIndices["Artikel"]] || "",
               omschrijving: rawRow[colIndices["Artikelomschrijving"]] || "",
@@ -121,11 +105,11 @@
               cradle: parseInt(rawRow[colIndices["Cradle behoefte"]] || 0) || 0,
               cradleType: rawRow[colIndices["Cradle Type"]] || "",
               pallet: parseInt(rawRow[colIndices["Pallet behoefte"]] || 0) || 0,
-              palletType: palletType
+              palletType
             });
           }
 
-          // Groeperen voor samenvatting
+          // Samenvatting groeperen
           const grouped = {};
           const ordersPerType = {};
           rows.forEach(r => {
@@ -141,14 +125,14 @@
 
           const sortedTypes = Object.keys(grouped).sort();
 
-          // Bouw HTML
+          // Bouw samenvatting
           let html = `
             <div class="info">
-              Bestand: <strong>${file.name}</strong> • Verwerkt op: ${new Date().toLocaleString('nl-NL')} • ${rows.length} regels verwerkt
+              Bestand: <strong>${file.name}</strong> • Verwerkt op: ${new Date().toLocaleString('nl-NL')} • ${rows.length} orders
             </div>
 
-            <h2>Samenvatting per Palletmaat</h2>
-            <table class="summary-table">
+            <h2>Samenvatting Pallet- en Cradlebehoefte</h2>
+            <table>
               <thead>
                 <tr>
                   <th>Pallet Type</th>
@@ -161,42 +145,50 @@
 
           let totalOrders = 0, totalCradles = 0, totalPallets = 0;
           sortedTypes.forEach(type => {
-            const countOrders = ordersPerType[type]?.size || 0;
+            const count = ordersPerType[type]?.size || 0;
             const cradles = grouped[type].cradles;
             const pallets = grouped[type].pallets;
-            totalOrders += countOrders;
+            totalOrders += count;
             totalCradles += cradles;
             totalPallets += pallets;
 
             html += `<tr>
               <td><strong>${type}</strong></td>
-              <td>${countOrders}</td>
+              <td>${count}</td>
               <td>${cradles}</td>
               <td>${pallets}</td>
             </tr>`;
           });
 
           html += `<tr class="total-row">
-              <td>TOTAAL</td>
+              <td><strong>TOTAAL</strong></td>
               <td>${totalOrders}</td>
               <td>${totalCradles}</td>
               <td>${totalPallets}</td>
-            </tr></tbody></table>
+            </tr>
+              </tbody>
+            </table>
 
-            <div class="section">
-              <h2>Volledige details (alle orders)</h2>
-              <table id="detailTable">
+            <button class="toggle-btn" onclick="document.getElementById('details').style.display = 
+              document.getElementById('details').style.display === 'block' ? 'none' : 'block';
+              this.innerText = this.innerText.includes('Toon') ? 'Verberg alle details' : 'Toon alle details';">
+              Toon alle details
+            </button>
+
+            <div id="details" class="details-section">
+              <h2>Alle orders in detail</h2>
+              <table class="details-table">
                 <thead>
                   <tr>
-                    <th onclick="sortTable(this.parentNode.parentNode.parentNode, 0)">Ordernummer</th>
-                    <th onclick="sortTable(this.parentNode.parentNode.parentNode, 1)">Afleverdatum</th>
-                    <th onclick="sortTable(this.parentNode.parentNode.parentNode, 2)">Artikel</th>
-                    <th onclick="sortTable(this.parentNode.parentNode.parentNode, 3)">Artikelomschrijving</th>
-                    <th onclick="sortTable(this.parentNode.parentNode.parentNode, 4)">Aantal</th>
-                    <th onclick="sortTable(this.parentNode.parentNode.parentNode, 5)">Cradle behoefte</th>
-                    <th onclick="sortTable(this.parentNode.parentNode.parentNode, 6)">Cradle Type</th>
-                    <th onclick="sortTable(this.parentNode.parentNode.parentNode, 7)">Pallet behoefte</th>
-                    <th onclick="sortTable(this.parentNode.parentNode.parentNode, 8)">Pallet Type</th>
+                    <th>Ordernummer</th>
+                    <th>Afleverdatum</th>
+                    <th>Artikel</th>
+                    <th>Artikelomschrijving</th>
+                    <th>Aantal</th>
+                    <th>Cradle behoefte</th>
+                    <th>Cradle Type</th>
+                    <th>Pallet behoefte</th>
+                    <th>Pallet Type</th>
                   </tr>
                 </thead>
                 <tbody>`;
