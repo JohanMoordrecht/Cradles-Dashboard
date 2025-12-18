@@ -3,82 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pallet & Cradle Behoefte Dashboard</title>
+  <title>Pallet & Cradle Behoefte - Volledig Dashboard</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-      margin: 0;
-      padding: 20px;
-      color: #333;
-    }
-    h1 {
-      text-align: center;
-      color: #2c3e50;
-    }
-    .container {
-      max-width: 1000px;
-      margin: 0 auto;
-      background: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .upload-area {
-      border: 3px dashed #3498db;
-      border-radius: 10px;
-      padding: 40px;
-      text-align: center;
-      margin-bottom: 30px;
-      background: #ecf0f1;
-      transition: background 0.3s;
-    }
-    .upload-area:hover {
-      background: #d6e6f5;
-    }
-    .upload-area input {
-      margin-top: 15px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th {
-      background: #3498db;
-      color: white;
-      padding: 12px;
-      text-align: left;
-    }
-    td {
-      padding: 10px 12px;
-      border-bottom: 1px solid #ddd;
-    }
-    tr:nth-child(even) {
-      background: #f9f9f9;
-    }
-    .total-row {
-      font-weight: bold;
-      background: #2c3e50 !important;
-      color: white;
-      font-size: 1.1em;
-    }
-    .info {
-      text-align: center;
-      color: #7f8c8d;
-      margin: 20px 0;
-    }
-    .error {
-      color: #e74c3c;
-      font-weight: bold;
-      text-align: center;
-    }
+    body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+    h1, h2 { text-align: center; color: #2c3e50; }
+    .container { max-width: 1400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .upload-area { border: 3px dashed #3498db; border-radius: 10px; padding: 40px; text-align: center; margin-bottom: 30px; background: #ecf0f1; }
+    .upload-area:hover { background: #d6e6f5; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th { background: #3498db; color: white; padding: 12px; cursor: pointer; }
+    th:hover { background: #2980b9; }
+    td { padding: 10px 12px; border-bottom: 1px solid #ddd; text-align: center; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    .total-row { font-weight: bold; background: #2c3e50 !important; color: white; font-size: 1.1em; }
+    .summary-table th { background: #27ae60; }
+    .info { text-align: center; color: #7f8c8d; margin: 20px 0; font-size: 1.1em; }
+    .error { color: #e74c3c; font-weight: bold; text-align: center; }
+    .section { margin-top: 50px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Pallet & Cradle Behoefte Dashboard</h1>
+    <h1>Pallet & Cradle Behoefte - Volledig Dashboard</h1>
 
     <div class="upload-area">
       <p><strong>Upload je Excel-bestand (.xls of .xlsx)</strong></p>
@@ -90,6 +37,21 @@
   </div>
 
   <script>
+    // Functie om tabel te sorteren op kolom
+    function sortTable(table, colIndex, asc = true) {
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.sort((a, b) => {
+        let aText = a.cells[colIndex].innerText;
+        let bText = b.cells[colIndex].innerText;
+        if (!isNaN(aText) && !isNaN(bText)) {
+          return asc ? Number(aText) - Number(bText) : Number(bText) - Number(aText);
+        }
+        return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+      });
+      rows.forEach(row => tbody.appendChild(row));
+    }
+
     document.getElementById('fileInput').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -100,13 +62,11 @@
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 
           // Zoek header rij
           let headerRow = -1;
-          const requiredCols = ["Ordernummer", "Afleverdatum", "Artikel", "Artikelomschrijving",
-                                "Aantal", "Cradle behoefte", "Cradle Type", "Pallet behoefte", "Pallet Type"];
-
+          const requiredCols = ["Ordernummer","Afleverdatum","Artikel","Artikelomschrijving","Aantal","Cradle behoefte","Cradle Type","Pallet behoefte","Pallet Type"];
           for (let i = 0; i < json.length; i++) {
             const row = json[i].map(cell => (cell || "").toString().trim());
             if (requiredCols.every(col => row.includes(col))) {
@@ -115,37 +75,40 @@
             }
           }
 
-          if (headerRow === -1) {
-            throw new Error("Kolomnamen niet gevonden. Zorg dat de kolommen exact overeenkomen met de originele namen.");
-          }
+          if (headerRow === -1) throw new Error("Kolomnamen niet gevonden in het bestand.");
 
-          // Maak header mapping
           const headers = json[headerRow];
           const colIndices = {};
           requiredCols.forEach(col => {
-            const idx = headers.indexOf(col);
+            const idx = headers.findIndex(h => (h || "").toString().trim() === col);
             if (idx !== -1) colIndices[col] = idx;
           });
 
-          // Verzamel data rijen
+          // Verzamel alle data rijen (skip subtotaal en lege rijen)
           const rows = [];
           for (let i = headerRow + 1; i < json.length; i++) {
-            const row = json[i];
-            if (!row || row.length === 0) continue;
+            const rawRow = json[i];
+            if (!rawRow || rawRow.filter(c => c !== "").length < 3) continue; // te leeg
 
-            const palletType = row[colIndices["Pallet Type"]];
-            const ordernummer = row[colIndices["Ordernummer"]];
-            if (!palletType && !ordernummer) continue; // skip subtotaal rijen
+            const ordernummer = rawRow[colIndices["Ordernummer"]] || "";
+            const palletType = rawRow[colIndices["Pallet Type"]] || "";
+
+            if (ordernummer === "" && palletType === "") continue; // subtotaal rij
 
             rows.push({
-              ordernummer: ordernummer || "",
-              palletType: palletType || "",
-              cradle: parseInt(row[colIndices["Cradle behoefte"]] || 0),
-              pallet: parseInt(row[colIndices["Pallet behoefte"]] || 0)
+              ordernummer: ordernummer,
+              afleverdatum: rawRow[colIndices["Afleverdatum"]] || "",
+              artikel: rawRow[colIndices["Artikel"]] || "",
+              omschrijving: rawRow[colIndices["Artikelomschrijving"]] || "",
+              aantal: rawRow[colIndices["Aantal"]] || "",
+              cradle: parseInt(rawRow[colIndices["Cradle behoefte"]] || 0),
+              cradleType: rawRow[colIndices["Cradle Type"]] || "",
+              pallet: parseInt(rawRow[colIndices["Pallet behoefte"]] || 0),
+              palletType: palletType
             });
           }
 
-          // Groepeer per Pallet Type
+          // Groeperen voor samenvatting
           const grouped = {};
           const ordersPerType = {};
           rows.forEach(r => {
@@ -158,15 +121,16 @@
             if (r.ordernummer) ordersPerType[r.palletType].add(r.ordernummer);
           });
 
-          // Sorteer op palletType
           const sortedTypes = Object.keys(grouped).sort();
 
-          // Bouw HTML tabel
+          // Bouw output
           let html = `
             <div class="info">
-              Bestand: <strong>${file.name}</strong> • Verwerkt op: ${new Date().toLocaleString('nl-NL')}
+              Bestand: <strong>${file.name}</strong> • Verwerkt op: ${new Date().toLocaleString('nl-NL')} • ${rows.length} regels gevonden
             </div>
-            <table>
+
+            <h2>Samenvatting per Palletmaat</h2>
+            <table class="summary-table">
               <thead>
                 <tr>
                   <th>Pallet Type</th>
@@ -177,37 +141,63 @@
               </thead>
               <tbody>`;
 
-          let totalOrders = 0;
-          let totalCradles = 0;
-          let totalPallets = 0;
-
+          let totalOrders = 0, totalCradles = 0, totalPallets = 0;
           sortedTypes.forEach(type => {
-            const countOrders = ordersPerType[type].size;
+            const countOrders = ordersPerType[type]?.size || 0;
             const cradles = grouped[type].cradles;
             const pallets = grouped[type].pallets;
-
             totalOrders += countOrders;
             totalCradles += cradles;
             totalPallets += pallets;
 
-            html += `
-              <tr>
-                <td><strong>${type || 'Onbekend'}</strong></td>
-                <td>${countOrders}</td>
-                <td>${cradles}</td>
-                <td>${pallets}</td>
-              </tr>`;
+            html += `<tr>
+              <td><strong>${type || 'Onbekend'}</strong></td>
+              <td>${countOrders}</td>
+              <td>${cradles}</td>
+              <td>${pallets}</td>
+            </tr>`;
           });
 
-          html += `
-              <tr class="total-row">
-                <td>TOTAAL</td>
-                <td>${totalOrders}</td>
-                <td>${totalCradles}</td>
-                <td>${totalPallets}</td>
-              </tr>
-            </tbody>
-          </table>`;
+          html += `<tr class="total-row">
+              <td>TOTAAL</td>
+              <td>${totalOrders}</td>
+              <td>${totalCradles}</td>
+              <td>${totalPallets}</td>
+            </tr></tbody></table>
+
+            <div class="section">
+              <h2>Alle details uit het Excel-bestand</h2>
+              <table id="detailTable">
+                <thead>
+                  <tr>
+                    <th onclick="sortTable(document.getElementById('detailTable'), 0)">Ordernummer</th>
+                    <th onclick="sortTable(document.getElementById('detailTable'), 1)">Afleverdatum</th>
+                    <th onclick="sortTable(document.getElementById('detailTable'), 2)">Artikel</th>
+                    <th onclick="sortTable(document.getElementById('detailTable'), 3)">Artikelomschrijving</th>
+                    <th onclick="sortTable(document.getElementById('detailTable'), 4)">Aantal</th>
+                    <th onclick="sortTable(document.getElementById('detailTable'), 5)">Cradle behoefte</th>
+                    <th onclick="sortTable(document.getElementById('detailTable'), 6)">Cradle Type</th>
+                    <th onclick="sortTable(document.getElementById('detailTable'), 7)">Pallet behoefte</th>
+                    <th onclick="sortTable(document.getElementById('detailTable'), 8)">Pallet Type</th>
+                  </tr>
+                </thead>
+                <tbody>`;
+
+          rows.forEach(r => {
+            html += `<tr>
+              <td>${r.ordernummer}</td>
+              <td>${r.afleverdatum}</td>
+              <td>${r.artikel}</td>
+              <td style="text-align:left;">${r.omschrijving}</td>
+              <td>${r.aantal}</td>
+              <td>${r.cradle}</td>
+              <td>${r.cradleType}</td>
+              <td>${r.pallet}</td>
+              <td><strong>${r.palletType}</strong></td>
+            </tr>`;
+          });
+
+          html += `</tbody></table></div>`;
 
           document.getElementById('output').innerHTML = html;
 
