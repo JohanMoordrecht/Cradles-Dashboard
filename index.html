@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cradle & Pallet Dashboard - Final v5</title>
+    <title>Cradle & Pallet Dashboard - Final & Robust</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; background: #f9f9f9; color: #333;}
@@ -21,34 +21,21 @@
 <body>
 
 <h1>LOGISTIEK DASHBOARD – CRADLE & PALLET BEHOEFTE</h1>
-<p style="text-align:center;"><strong>Laatste update:</strong> <span id="lastUpdate">originele data</span></p>
+<p style="text-align:center;"><strong>Laatste update:</strong> <span id="lastUpdate">nog geen bestand geüpload</span></p>
 
 <div class="upload">
     <h2>Upload nieuwe Excel (.xls of .xlsx)</h2>
-    <p>Selecteer je Logistiek-bestand – het dashboard update automatisch</p>
+    <p>Selecteer je "Logistiek - Pallet behoefte" bestand</p>
     <input type="file" id="excelFile" accept=".xls,.xlsx" />
-    <p id="status">Oorspronkelijke data geladen</p>
+    <p id="status">Upload een bestand om het dashboard bij te werken</p>
 </div>
 
 <div id="dashboardContent">
-    <!-- Tabellen komen hier -->
+    <p style="text-align:center; color:#666;">Upload een Excel-bestand om het dashboard te zien.</p>
 </div>
 
 <script>
-// Placeholder voor bij openen (je originele totalen)
-const placeholderData = [
-    {date: "18-11-2025", cradle: 199, cradleType: "110/4", pallet: 31, palletType: "170x120"},
-    {date: "21-11-2025", cradle: 44, cradleType: "120/5", pallet: 6, palletType: "205x120"},
-    // ... meer als je wilt, maar niet nodig – upload overschrijft alles
-];
-
-// Laad placeholder bij openen
-window.onload = () => {
-    renderDashboard(placeholderData);
-    document.getElementById('status').innerHTML = 'Oorspronkelijke data geladen – upload een nieuwe Excel voor volledige update';
-};
-
-// Excel upload
+// Excel upload handler
 document.getElementById('excelFile').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -60,59 +47,67 @@ document.getElementById('excelFile').addEventListener('change', function(e) {
             const data = ev.target.result;
             const workbook = XLSX.read(data, {type: 'binary'});
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ""});
+            const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: "", range: 0});
 
             const processed = [];
-            let started = false;
+            let headerFound = false;
+
             for (const row of rows) {
+                if (row.length === 0) continue;
+
+                // Zoek de header rij met "Ordernummer"
                 const orderCell = String(row[0] || '').trim();
                 if (orderCell.includes('Ordernummer')) {
-                    started = true;
+                    headerFound = true;
                     continue;
                 }
-                if (!started || row.length < 9 || orderCell === '') continue;
 
-                const cradleStr = String(row[5] || '0').replace(/[\.,]/g, '');
-                const palletStr = String(row[7] || '0').replace(/[\.,]/g, '');
+                // Alleen rijen na header, en met een geldig ordernummer (begint met cijfers)
+                if (!headerFound) continue;
+                if (!orderCell.match(/^\d{6,}/)) continue; // Ordernummer begint met 6+ cijfers
+
+                // Kolommen: 0=Ordernummer, 1=Afleverdatum, 5=Cradle behoefte, 6=Cradle Type, 7=Pallet behoefte, 8=Pallet Type
+                const date = String(row[1] || '').trim();
+                if (!date.match(/^\d{2}-\d{2}-\d{4}$/)) continue; // geldige datum
+
+                const cradleRaw = String(row[5] || '0').replace(/[^\d-]/g, '');
+                const palletRaw = String(row[7] || '0').replace(/[^\d-]/g, '');
 
                 processed.push({
-                    date: String(row[1] || '').trim(),
-                    cradle: parseInt(cradleStr) || 0,
+                    date: date,
+                    cradle: parseInt(cradleRaw) || 0,
                     cradleType: String(row[6] || 'Overig').trim(),
-                    pallet: parseInt(palletStr) || 0,
+                    pallet: parseInt(palletRaw) || 0,
                     palletType: String(row[8] || '').trim()
                 });
             }
 
-            if (processed.length === 0) throw "Geen orders gevonden in het bestand";
+            if (processed.length === 0) {
+                throw "Geen geldige orders gevonden. Controleer of het bestand de juiste structuur heeft.";
+            }
 
             renderDashboard(processed);
             document.getElementById('status').innerHTML = `Succes! ${processed.length} orders geladen uit ${file.name}`;
             document.getElementById('lastUpdate').innerText = new Date().toLocaleDateString('nl-NL');
         } catch (err) {
-            document.getElementById('status').innerHTML = '<span style="color:red;">Fout: ' + err + ' – probeer een ander bestand of .xlsx</span>';
+            document.getElementById('status').innerHTML = '<span style="color:red;">Fout: ' + err + '</span>';
+            console.error(err);
         }
     };
     reader.readAsBinaryString(file);
 });
 
-// Volledige render functie (nu 100% correct)
+// Render functie
 function renderDashboard(data) {
-    if (data.length === 0) {
-        document.getElementById('dashboardContent').innerHTML = '<p style="text-align:center; color:red;">Geen data beschikbaar.</p>';
-        return;
-    }
-
     const weekMap = {};
     data.forEach(row => {
-        if (!row.date) return;
         const parts = row.date.split('-');
-        if (parts.length !== 3) return;
-        const [d, m, y] = parts.map(n => parseInt(n));
+        const d = parseInt(parts[0]);
+        const m = parseInt(parts[1]);
+        const y = parseInt(parts[2]);
         const date = new Date(y, m - 1, d);
-        if (isNaN(date.getTime())) return;
         const weekNum = getWeekNumber(date);
-        const yearWeek = `\( {y}-W \){String(weekNum).padStart(2, '0')}`;
+        const yearWeek = `${y}-W${String(weekNum).padStart(2, '0')}`;
         if (!weekMap[yearWeek]) weekMap[yearWeek] = {cradles: {}, pallets: {}};
         weekMap[yearWeek].cradles[row.cradleType] = (weekMap[yearWeek].cradles[row.cradleType] || 0) + row.cradle;
         weekMap[yearWeek].pallets[row.palletType] = (weekMap[yearWeek].pallets[row.palletType] || 0) + row.pallet;
@@ -120,9 +115,12 @@ function renderDashboard(data) {
 
     const sortedWeeks = Object.keys(weekMap).sort();
 
-    const cradleTypes = [...new Set(data.map(r => r.cradleType).filter(Boolean))].sort();
-    const palletTypes = [...new Set(data.map(r => r.palletType).filter(Boolean))].sort((a, b) => {
-        const area = t => t.split('x').reduce((p, c) => p * parseInt(c || 0), 1);
+    const cradleTypes = [...new Set(data.map(r => r.cradleType))].filter(Boolean).sort();
+    const palletTypes = [...new Set(data.map(r => r.palletType))].filter(Boolean).sort((a, b) => {
+        const area = t => {
+            const nums = t.split('x').map(n => parseInt(n) || 0);
+            return nums[0] * nums[1];
+        };
         return area(b) - area(a);
     });
 
@@ -183,7 +181,7 @@ function renderDashboard(data) {
     document.getElementById('dashboardContent').innerHTML = html;
 }
 
-// Correcte ISO week functie
+// ISO week nummer
 function getWeekNumber(d) {
     const date = new Date(d);
     date.setHours(0, 0, 0, 0);
