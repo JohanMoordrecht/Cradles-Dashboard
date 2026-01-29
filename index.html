@@ -3,221 +3,241 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pallet & Cradle Behoefte Dashboard</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <title>Artikel Formulier</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-    h1, h2 { text-align: center; color: #2c3e50; }
-    .container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    .upload-area { border: 3px dashed #3498db; border-radius: 10px; padding: 40px; text-align: center; margin-bottom: 30px; background: #ecf0f1; }
-    .upload-area:hover { background: #d6e6f5; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th { background: #27ae60; color: white; padding: 14px; font-size: 1.1em; }
-    td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
-    tr:nth-child(even) { background: #f9f9f9; }
-    .total-row { font-weight: bold; background: #2c3e50 !important; color: white; font-size: 1.2em; }
-    .info { text-align: center; color: #7f8c8d; margin: 20px 0; font-size: 1.1em; }
-    .error { color: #e74c3c; font-weight: bold; text-align: center; }
-    .toggle-btn {
-      display: block;
-      width: 300px;
-      margin: 30px auto;
-      padding: 12px;
-      background: #3498db;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 1.1em;
-      cursor: pointer;
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Segoe UI,sans-serif;background:#fff;padding:20px;min-height:100vh}
+    .container{max-width:900px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.1);overflow:hidden}
+    .header{background:#fff;color:#E30613;padding:25px;text-align:center}
+    .header h1{font-size:26px;margin-bottom:6px}
+    .form-content{padding:30px}
+    .form-group{margin-bottom:20px}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    label{display:block;font-weight:600;color:#333;margin-bottom:6px;font-size:14px}
+    input,select,textarea{width:100%;padding:11px;border:2px solid #e0e0e0;border-radius:6px;font-size:14px;background:#fff;box-shadow:inset 0 1px 2px rgba(0,0,0,.04);transition:border-color .2s}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:#8B9F1C;box-shadow:0 0 0 3px rgba(139,159,28,.15)}
+    .section-title{font-size:17px;font-weight:700;color:#8B9F1C;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #8B9F1C}
+    .helper-text{font-size:12px;color:#666;margin-top:4px}
+    .button-group{display:flex;gap:12px;margin-top:30px}
+    button{flex:1;padding:13px;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s}
+    .btn-primary{background:#E30613;color:#fff}
+    .btn-primary:hover{background:#b00510}
+    .btn-secondary{background:#f0f0f0;color:#333}
+    .btn-secondary:hover{background:#e0e0e0}
+    .btn-print{background:#10b981;color:#fff}
+    .btn-print:hover{background:#059669}
+    .error{color:#c00;font-size:12px;margin-top:4px;display:none}
+    
+    @media print{
+      @page{size:A4;margin:10mm}
+      body{background:#fff;padding:0;margin:0}
+      .container{box-shadow:none;border-radius:0;margin:0}
+      .button-group{display:none}
+      input,select,textarea{border:1px solid #333;background:#fff;color:#000;font-size:11pt;padding:6px}
+      .section-title{color:#8B9F1C;border-bottom:1px solid #8B9F1C}
+      .error{display:none}
     }
-    .toggle-btn:hover { background: #2980b9; }
-    .details-section { display: none; margin-top: 40px; }
-    .details-table th { background: #3498db; }
-    .details-table td.left { text-align: left; }
+    @media (max-width:768px){.form-row{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Pallet & Cradle Behoefte Dashboard</h1>
 
-    <div class="upload-area">
-      <p><strong>Upload je Excel-bestand (.xls of .xlsx)</strong></p>
-      <p>Bijv: Logistiek - Pallet behoefte.xls</p>
-      <input type="file" id="fileInput" accept=".xls,.xlsx" />
-    </div>
-
-    <div id="output"></div>
+<div class="container">
+  <div class="header">
+    <h1>ARTIKEL FORMULIER</h1>
+    <p id="lastMod" style="display:none">Laatste wijziging: —</p>
   </div>
+  
+  <div class="form-content">
+    <form id="f">
+      <div class="form-group">
+        <label for="d">Datum</label>
+        <input type="date" id="d" required>
+      </div>
+      <div class="form-group">
+        <label for="n">Naam</label>
+        <input type="text" id="n" required>
+      </div>
+      <div class="form-group">
+        <label for="a">Artikelnummer</label>
+        <input type="text" id="a" required>
+      </div>
 
-  <script>
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
+      <div class="section-title">Verpakking</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="se">Scanner eenheid</label>
+          <select id="se" required>
+            <option value="">—</option>
+            <option value="rol">Rol</option>
+            <option value="sheet">Sheet</option>
+            <option value="box">Box</option>
+            <option value="meters">Meters</option>
+            <option value="kilos">Kilo's</option>
+            <option value="pack">Pack</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="vi">Verpakt in</label>
+          <select id="vi" required>
+            <option value="">—</option>
+            <option value="doos">Doos</option>
+            <option value="folie">Folie</option>
+            <option value="koker">Koker</option>
+            <option value="box">Box</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="vp">Volume op pallet</label>
+        <input type="number" id="vp" min="0">
+      </div>
 
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      <div class="section-title">Afmetingen</div>
+      <div class="form-group">
+        <label for="cf">Collo formaat (L×B×H cm)</label>
+        <input type="text" id="cf" required placeholder="bijv. 40×30×25">
+        <div class="helper-text">Koker: Lengte × Ø</div>
+      </div>
+      <div class="form-group">
+        <label for="pf">Volle pallet (L×B×H cm)</label>
+        <input type="text" id="pf" placeholder="120×80×140">
+      </div>
+      <div class="form-group">
+        <label for="st">Stapelbaar</label>
+        <input type="text" id="st" placeholder="bijv. 5 lagen / 24 per laag">
+      </div>
 
-          const requiredCols = [
-            "Ordernummer", "Afleverdatum", "Artikel", "Artikelomschrijving",
-            "Aantal", "Cradle behoefte", "Cradle Type", "Pallet behoefte", "Pallet Type"
-          ];
+      <div class="section-title">Gewicht</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="cg">Colli gewicht (kg)</label>
+          <input type="number" step="0.01" min="0" id="cg" required>
+        </div>
+        <div class="form-group">
+          <label for="pg">Pallet gewicht (kg)</label>
+          <input type="number" step="0.01" min="0" id="pg">
+        </div>
+      </div>
 
-          let headerRow = -1;
-          for (let i = 0; i < json.length; i++) {
-            const row = json[i].map(cell => (cell || "").toString().trim());
-            if (requiredCols.every(col => row.includes(col))) {
-              headerRow = i;
-              break;
-            }
-          }
+      <div class="form-group">
+        <label for="op">Opmerkingen</label>
+        <textarea id="op" rows="3"></textarea>
+      </div>
 
-          if (headerRow === -1) throw new Error("Kolomnamen niet gevonden in het bestand.");
+      <div class="button-group">
+        <button type="button" class="btn-secondary" id="rst">Reset</button>
+        <button type="button" class="btn-print" id="ple">Print leeg</button>
+        <button type="button" class="btn-print" id="pif">Print ingevuld</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-          const headers = json[headerRow].map(h => (h || "").toString().trim());
-          const colIndices = {};
-          requiredCols.forEach(col => {
-            const idx = headers.indexOf(col);
-            if (idx === -1) throw new Error(`Kolom "${col}" niet gevonden.`);
-            colIndices[col] = idx;
-          });
+<script>
+const els = {
+  d: document.getElementById('d'),
+  n: document.getElementById('n'),
+  a: document.getElementById('a'),
+  se: document.getElementById('se'),
+  vi: document.getElementById('vi'),
+  vp: document.getElementById('vp'),
+  cf: document.getElementById('cf'),
+  pf: document.getElementById('pf'),
+  st: document.getElementById('st'),
+  cg: document.getElementById('cg'),
+  pg: document.getElementById('pg'),
+  op: document.getElementById('op'),
+  lastMod: document.getElementById('lastMod')
+};
 
-          const rows = [];
-          for (let i = headerRow + 1; i < json.length; i++) {
-            const rawRow = json[i];
-            if (!rawRow || rawRow.length < 5) continue;
+const defaults = {
+  d: new Date().toISOString().slice(0,10),
+  n: '', a: '', se: '', vi: '', vp: '', cf: '', pf: '', st: '', cg: '', pg: '', op: ''
+};
 
-            const ordernummer = (rawRow[colIndices["Ordernummer"]] || "").toString().trim();
-            const palletType = (rawRow[colIndices["Pallet Type"]] || "").toString().trim();
+function setValues(obj) {
+  for (const [k, v] of Object.entries(obj)) {
+    if (els[k]) els[k].value = v;
+  }
+}
 
-            if ((ordernummer === "" || ordernummer === "0") && (palletType === "" || palletType.toLowerCase().includes("totaal"))) continue;
+function getValues() {
+  const data = {};
+  for (const k in els) {
+    if (els[k]) data[k] = els[k].value;
+  }
+  return data;
+}
 
-            rows.push({
-              ordernummer, 
-              afleverdatum: rawRow[colIndices["Afleverdatum"]] || "",
-              artikel: rawRow[colIndices["Artikel"]] || "",
-              omschrijving: rawRow[colIndices["Artikelomschrijving"]] || "",
-              aantal: rawRow[colIndices["Aantal"]] || "",
-              cradle: parseInt(rawRow[colIndices["Cradle behoefte"]] || 0) || 0,
-              cradleType: rawRow[colIndices["Cradle Type"]] || "",
-              pallet: parseInt(rawRow[colIndices["Pallet behoefte"]] || 0) || 0,
-              palletType
-            });
-          }
+function showLastModified() {
+  const now = new Date();
+  const d = now.toLocaleDateString('nl-NL',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const t = now.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+  els.lastMod.textContent = `Laatste wijziging: ${d} ${t}`;
+  els.lastMod.style.display = 'block';
+}
 
-          // Samenvatting groeperen
-          const grouped = {};
-          const ordersPerType = {};
-          rows.forEach(r => {
-            const pt = r.palletType || "Onbekend";
-            if (!grouped[pt]) {
-              grouped[pt] = { cradles: 0, pallets: 0 };
-              ordersPerType[pt] = new Set();
-            }
-            grouped[pt].cradles += r.cradle;
-            grouped[pt].pallets += r.pallet;
-            if (r.ordernummer) ordersPerType[pt].add(r.ordernummer);
-          });
+// Init
+setValues(defaults);
 
-          const sortedTypes = Object.keys(grouped).sort();
+// Validatie (simpel)
+function isValid() {
+  let ok = true;
+  ['d','n','a','se','vi','cf','cg'].forEach(k => {
+    if (!els[k].value.trim()) {
+      els[k].style.borderColor = '#c00';
+      ok = false;
+    } else {
+      els[k].style.borderColor = '#e0e0e0';
+    }
+  });
+  if (els.cg.value && +els.cg.value <= 0) ok = false;
+  return ok;
+}
 
-          // Bouw samenvatting
-          let html = `
-            <div class="info">
-              Bestand: <strong>${file.name}</strong> • Verwerkt op: ${new Date().toLocaleString('nl-NL')} • ${rows.length} orders
-            </div>
+// Events
+document.getElementById('f').addEventListener('submit', e => {
+  e.preventDefault();
+  if (!isValid()) return alert('Vul alle verplichte velden in (rood gemarkeerd).');
+  
+  localStorage.setItem('artikel', JSON.stringify(getValues()));
+  showLastModified();
+  alert('Opgeslagen in localStorage');
+});
 
-            <h2>Samenvatting Pallet- en Cradlebehoefte</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Pallet Type</th>
-                  <th>Aantal Orders</th>
-                  <th>Totale Cradles</th>
-                  <th>Totale Pallets</th>
-                </tr>
-              </thead>
-              <tbody>`;
+document.getElementById('rst').onclick = () => {
+  if (!confirm('Reset formulier?')) return;
+  setValues(defaults);
+  els.lastMod.style.display = 'none';
+  document.querySelectorAll('input,select').forEach(el => el.style.borderColor = '#e0e0e0');
+};
 
-          let totalOrders = 0, totalCradles = 0, totalPallets = 0;
-          sortedTypes.forEach(type => {
-            const count = ordersPerType[type]?.size || 0;
-            const cradles = grouped[type].cradles;
-            const pallets = grouped[type].pallets;
-            totalOrders += count;
-            totalCradles += cradles;
-            totalPallets += pallets;
+document.getElementById('pif').onclick = () => window.print();
 
-            html += `<tr>
-              <td><strong>${type}</strong></td>
-              <td>${count}</td>
-              <td>${cradles}</td>
-              <td>${pallets}</td>
-            </tr>`;
-          });
+document.getElementById('ple').onclick = () => {
+  const vals = getValues();
+  setValues(defaults);
+  window.print();
+  setTimeout(() => setValues(vals), 300); // fallback
+  window.onafterprint = () => { setValues(vals); window.onafterprint = null; };
+};
 
-          html += `<tr class="total-row">
-              <td><strong>TOTAAL</strong></td>
-              <td>${totalOrders}</td>
-              <td>${totalCradles}</td>
-              <td>${totalPallets}</td>
-            </tr>
-              </tbody>
-            </table>
-
-            <button class="toggle-btn" onclick="document.getElementById('details').style.display = 
-              document.getElementById('details').style.display === 'block' ? 'none' : 'block';
-              this.innerText = this.innerText.includes('Toon') ? 'Verberg alle details' : 'Toon alle details';">
-              Toon alle details
-            </button>
-
-            <div id="details" class="details-section">
-              <h2>Alle orders in detail</h2>
-              <table class="details-table">
-                <thead>
-                  <tr>
-                    <th>Ordernummer</th>
-                    <th>Afleverdatum</th>
-                    <th>Artikel</th>
-                    <th>Artikelomschrijving</th>
-                    <th>Aantal</th>
-                    <th>Cradle behoefte</th>
-                    <th>Cradle Type</th>
-                    <th>Pallet behoefte</th>
-                    <th>Pallet Type</th>
-                  </tr>
-                </thead>
-                <tbody>`;
-
-          rows.forEach(r => {
-            html += `<tr>
-              <td>${r.ordernummer}</td>
-              <td>${r.afleverdatum}</td>
-              <td>${r.artikel}</td>
-              <td class="left">${r.omschrijving}</td>
-              <td>${r.aantal}</td>
-              <td>${r.cradle}</td>
-              <td>${r.cradleType}</td>
-              <td>${r.pallet}</td>
-              <td><strong>${r.palletType}</strong></td>
-            </tr>`;
-          });
-
-          html += `</tbody></table></div>`;
-
-          document.getElementById('output').innerHTML = html;
-
-        } catch (err) {
-          document.getElementById('output').innerHTML = `<p class="error">Fout: ${err.message}</p>`;
-          console.error(err);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    });
-  </script>
+// Simpele barcode support
+let buf = '';
+document.addEventListener('keydown', e => {
+  if (!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if (e.key === 'Enter' && buf.length > 3) {
+    document.activeElement.value = buf;
+    document.activeElement.dispatchEvent(new Event('input'));
+    buf = '';
+    e.preventDefault();
+  } else if (e.key.length === 1) {
+    buf += e.key;
+    clearTimeout(window.bufTimer);
+    window.bufTimer = setTimeout(() => buf = '', 180);
+  }
+});
+</script>
 </body>
 </html>
